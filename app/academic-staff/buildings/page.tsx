@@ -36,6 +36,9 @@ import {
 } from "@/lib/api/buildings"
 import type { Building } from "@/lib/types"
 
+// Add the import for toast helper functions
+import { successToast, errorToast, warningToast } from "@/lib/utils/toast-helper"
+
 export default function BuildingsPage() {
   const { toast } = useToast()
   const [buildings, setBuildings] = useState<Building[]>([])
@@ -51,6 +54,7 @@ export default function BuildingsPage() {
   const [deleteBuildingName, setDeleteBuildingName] = useState("")
   const [includeDisabled, setIncludeDisabled] = useState(true)
 
+  // In the fetchBuildings function
   const fetchBuildings = async () => {
     setIsLoading(true)
     try {
@@ -58,18 +62,31 @@ export default function BuildingsPage() {
       if (response.success) {
         setBuildings(response.data.buildings)
       } else {
-        toast({
+        errorToast({
           title: "錯誤",
-          description: "無法獲取大樓列表，請稍後再試",
-          variant: "destructive",
+          description: response.error?.message || "無法獲取大樓列表，請稍後再試",
         })
       }
     } catch (error) {
       console.error("Failed to fetch buildings:", error)
-      toast({
+
+      // Try to extract error message if it's a string representation of JSON
+      let errorMessage = "無法獲取大樓列表，請稍後再試"
+
+      if (error instanceof Error) {
+        try {
+          const errorData = JSON.parse(error.message)
+          if (errorData.detail && errorData.detail.error && errorData.detail.error.message) {
+            errorMessage = errorData.detail.error.message
+          }
+        } catch (e) {
+          errorMessage = error.message || errorMessage
+        }
+      }
+
+      errorToast({
         title: "錯誤",
-        description: "無法獲取大樓列表，請稍後再試",
-        variant: "destructive",
+        description: errorMessage,
       })
     } finally {
       setIsLoading(false)
@@ -80,12 +97,12 @@ export default function BuildingsPage() {
     fetchBuildings()
   }, [includeDisabled, toast])
 
+  // In the handleAddBuilding function
   const handleAddBuilding = async () => {
     if (!newBuildingName.trim()) {
-      toast({
+      warningToast({
         title: "請輸入大樓名稱",
         description: "大樓名稱不能為空",
-        variant: "destructive",
       })
       return
     }
@@ -94,7 +111,7 @@ export default function BuildingsPage() {
     try {
       const response = await createBuilding({ buildingName: newBuildingName })
       if (response.success) {
-        toast({
+        successToast({
           title: "新增成功",
           description: "大樓已成功新增",
         })
@@ -102,30 +119,28 @@ export default function BuildingsPage() {
         setShowAddDialog(false)
         fetchBuildings()
       } else {
-        toast({
+        errorToast({
           title: "新增失敗",
           description: response.error?.message || "無法新增大樓，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to add building:", error)
-      toast({
+      errorToast({
         title: "新增失敗",
         description: "無法新增大樓，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  // In the handleEditBuilding function
   const handleEditBuilding = async () => {
     if (!editBuildingName.trim()) {
-      toast({
+      warningToast({
         title: "請輸入大樓名稱",
         description: "大樓名稱不能為空",
-        variant: "destructive",
       })
       return
     }
@@ -134,81 +149,77 @@ export default function BuildingsPage() {
     try {
       const response = await updateBuilding(editBuildingId, { buildingName: editBuildingName })
       if (response.success) {
-        toast({
+        successToast({
           title: "更新成功",
           description: "大樓資訊已成功更新",
         })
         setShowEditDialog(false)
         fetchBuildings()
       } else {
-        toast({
+        errorToast({
           title: "更新失敗",
           description: response.error?.message || "無法更新大樓資訊，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to update building:", error)
-      toast({
+      errorToast({
         title: "更新失敗",
         description: "無法更新大樓資訊，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  // In the handleToggleStatus function
   const handleToggleStatus = async (buildingId: string, enabled: boolean) => {
     try {
       const response = await toggleBuildingStatus(buildingId, enabled)
       if (response.success) {
-        toast({
+        successToast({
           title: enabled ? "已啟用" : "已停用",
           description: `大樓已成功${enabled ? "啟用" : "停用"}`,
         })
         fetchBuildings()
       } else {
-        toast({
+        errorToast({
           title: "操作失敗",
           description: response.error?.message || "無法更改大樓狀態，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to toggle building status:", error)
-      toast({
+      errorToast({
         title: "操作失敗",
         description: "無法更改大樓狀態，請稍後再試",
-        variant: "destructive",
       })
     }
   }
 
+  // In the handleDeleteBuilding function
   const handleDeleteBuilding = async () => {
     setIsSubmitting(true)
     try {
       const response = await deleteBuilding(deleteBuildingId)
       if (response.success) {
-        toast({
+        successToast({
           title: "刪除成功",
           description: "大樓已成功刪除",
         })
         setShowDeleteDialog(false)
         fetchBuildings()
       } else {
-        toast({
+        errorToast({
           title: "刪除失敗",
           description: response.error?.message || "無法刪除大樓，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to delete building:", error)
-      toast({
+      errorToast({
         title: "刪除失敗",
         description: "無法刪除大樓，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)

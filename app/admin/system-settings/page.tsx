@@ -8,6 +8,10 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/components/ui/use-toast"
 import { getSystemParameters, updateSystemParameters, type SystemParameters } from "@/lib/api/admin"
+// Update the system settings page to use the toast helper functions
+
+// First, add the import for toast helper functions
+import { successToast, errorToast } from "@/lib/utils/toast-helper"
 
 export default function SystemSettingsPage() {
   const { toast } = useToast()
@@ -19,12 +23,14 @@ export default function SystemSettingsPage() {
       enableEmailNotifications: true,
       enableLineNotifications: true,
       systemMaintenanceMode: false,
+      systemUrl: "https://equipment.ntunhs.edu.tw",
     },
   })
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
+    // In the fetchSettings function
     const fetchSettings = async () => {
       setIsLoading(true)
       try {
@@ -32,18 +38,16 @@ export default function SystemSettingsPage() {
         if (response.success && response.data) {
           setSettings(response.data)
         } else {
-          toast({
+          errorToast({
             title: "錯誤",
             description: response.error?.message || "無法獲取系統參數",
-            variant: "destructive",
           })
         }
       } catch (error) {
         console.error("Failed to fetch system parameters:", error)
-        toast({
+        errorToast({
           title: "錯誤",
           description: "無法獲取系統參數",
-          variant: "destructive",
         })
       } finally {
         setIsLoading(false)
@@ -53,28 +57,27 @@ export default function SystemSettingsPage() {
     fetchSettings()
   }, [toast])
 
+  // In the handleSave function
   const handleSave = async () => {
     setIsSaving(true)
     try {
       const response = await updateSystemParameters(settings)
       if (response.success) {
-        toast({
+        successToast({
           title: "成功",
           description: "系統參數已更新",
         })
       } else {
-        toast({
+        errorToast({
           title: "錯誤",
           description: response.error?.message || "無法更新系統參數",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to update system parameters:", error)
-      toast({
+      errorToast({
         title: "錯誤",
         description: "無法更新系統參數",
-        variant: "destructive",
       })
     } finally {
       setIsSaving(false)
@@ -150,27 +153,20 @@ export default function SystemSettingsPage() {
               />
               <p className="text-xs text-muted-foreground">設定每個申請可以包含的最大設備數量</p>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="systemUrl">系統網址</Label>
+              <Input
+                id="systemUrl"
+                type="url"
+                placeholder="https://equipment.ntunhs.edu.tw"
+                value={settings.parameters.systemUrl || ""}
+                onChange={(e) => handleInputChange("systemUrl", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">設定系統的公開網址，用於生成通知中的連結</p>
+            </div>
           </div>
 
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="enableEmailNotifications"
-                checked={settings.parameters.enableEmailNotifications}
-                onCheckedChange={(checked) => handleInputChange("enableEmailNotifications", checked)}
-              />
-              <Label htmlFor="enableEmailNotifications">啟用電子郵件通知</Label>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="enableLineNotifications"
-                checked={settings.parameters.enableLineNotifications}
-                onCheckedChange={(checked) => handleInputChange("enableLineNotifications", checked)}
-              />
-              <Label htmlFor="enableLineNotifications">啟用 LINE 通知</Label>
-            </div>
-
             <div className="flex items-center space-x-2">
               <Switch
                 id="systemMaintenanceMode"

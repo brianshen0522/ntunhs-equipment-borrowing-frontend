@@ -198,7 +198,7 @@ export async function getUsers(params: {
     if (params.page) queryParams.append("page", params.page.toString())
     if (params.limit) queryParams.append("limit", params.limit.toString())
     if (params.query) queryParams.append("query", params.query)
-    if (params.role) queryParams.append("role", params.role)
+    if (params.role && params.role !== "all") queryParams.append("role", params.role)
     if (params.sortBy) queryParams.append("sortBy", params.sortBy)
     if (params.sortOrder) queryParams.append("sortOrder", params.sortOrder)
 
@@ -212,7 +212,20 @@ export async function getUsers(params: {
       },
     })
 
-    return await response.json()
+    const data = await response.json()
+
+    // Handle the new error format
+    if (data.detail && !data.detail.success) {
+      return {
+        success: false,
+        error: data.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
+
+    return data
   } catch (error) {
     console.error("Get users error:", error)
     return {
@@ -281,7 +294,20 @@ export async function getLineBotSettings(): Promise<LineBotSettingsResponse> {
       },
     })
 
-    return await response.json()
+    const data = await response.json()
+
+    // Handle the new error format
+    if (data.detail && !data.detail.success) {
+      return {
+        success: false,
+        error: data.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
+
+    return data
   } catch (error) {
     console.error("Get LINE bot settings error:", error)
     return {

@@ -13,10 +13,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/components/ui/use-toast"
-import { Loader2, AlertTriangle, CheckCircle, ClipboardList, Clock } from "lucide-react"
+import { Loader2, AlertTriangle, CheckCircle, ClipboardList, Clock, InfoIcon } from "lucide-react"
 import { ThemeSwitch } from "@/components/theme-switch"
-import { getRequestForBuildingManager, submitBuildingResponse } from "@/lib/api/building-responses"
+import {
+  getRequestForBuildingManager,
+  submitBuildingResponse,
+  type BuildingResponse,
+} from "@/lib/api/building-responses"
 import type { BuildingResponseItem } from "@/lib/api/building-responses"
+
+// First, add the import for toast helper functions
+import { successToast, errorToast, warningToast } from "@/lib/utils/toast-helper"
 
 export default function BuildingManagerResponsePage({ params }: { params: { token: string } }) {
   // Inside your component, add:
@@ -47,9 +54,11 @@ export default function BuildingManagerResponsePage({ params }: { params: { toke
       buildingId: string | null
       items: Array<any>
     }
+    allBuildingResponses?: BuildingResponse[]
   } | null>(null)
   const [selectedBuilding, setSelectedBuilding] = useState("")
   const [availableItems, setAvailableItems] = useState<BuildingResponseItem[]>([])
+  const [existingResponse, setExistingResponse] = useState<BuildingResponse | null>(null)
   const [error, setError] = useState<{
     code?: string
     message: string
@@ -77,12 +86,12 @@ export default function BuildingManagerResponsePage({ params }: { params: { toke
           if (response.error?.code === "EXPIRED") {
             setError({
               code: "EXPIRED",
-              message: "此填表連結已過期，請聯絡總務處重新發送連結",
+              message: response.error?.message || "此填表連結已過期，請聯絡總務處重新發送連結",
             })
           } else if (response.error?.code === "INVALID_TOKEN") {
             setError({
               code: "INVALID_TOKEN",
-              message: "無效的回覆令牌，請確認連結是否正確",
+              message: response.error?.message || "無效的回覆令牌，請確認連結是否正確",
             })
           } else {
             setError({
@@ -92,8 +101,23 @@ export default function BuildingManagerResponsePage({ params }: { params: { toke
         }
       } catch (error) {
         console.error("Failed to fetch request data:", error)
+
+        // Try to extract error message if it's a string representation of JSON
+        let errorMessage = "無法獲取申請資料，請稍後再試"
+
+        if (error instanceof Error) {
+          try {
+            const errorData = JSON.parse(error.message)
+            if (errorData.detail && errorData.detail.error && errorData.detail.error.message) {
+              errorMessage = errorData.detail.error.message
+            }
+          } catch (e) {
+            errorMessage = error.message || errorMessage
+          }
+        }
+
         setError({
-          message: "無法獲取申請資料，請稍後再試",
+          message: errorMessage,
         })
       } finally {
         setIsLoading(false)
@@ -102,6 +126,44 @@ export default function BuildingManagerResponsePage({ params }: { params: { toke
 
     fetchRequestData()
   }, [params.token])
+
+  // Update this function to handle building selection and check for existing responses
+  const handleBuildingChange = (buildingId: string) => {
+    setSelectedBuilding(buildingId)
+
+    // Check if there's an existing response for this building
+    if (requestData?.allBuildingResponses && requestData.allBuildingResponses.length > 0) {
+      const response = requestData.allBuildingResponses.find((resp) => resp.buildingId === buildingId)
+
+      setExistingResponse(response || null)
+
+      // If there's an existing response, pre-fill the form with those values
+      if (response) {
+        console.log("Found existing response for building:", buildingId, response)
+
+        // Create a new array with the available quantities from the existing response
+        const updatedItems = requestData.items.map((item) => {
+          const existingItem = response.items.find((respItem) => respItem.itemId === item.itemId)
+          return {
+            itemId: item.itemId,
+            availableQuantity: existingItem ? existingItem.availableQuantity : 0,
+          }
+        })
+
+        setAvailableItems(updatedItems)
+      } else {
+        // Reset to zero if no existing response
+        if (requestData.items) {
+          setAvailableItems(
+            requestData.items.map((item) => ({
+              itemId: item.itemId,
+              availableQuantity: 0,
+            })),
+          )
+        }
+      }
+    }
+  }
 
   const handleQuantityChange = (itemId: string, value: number) => {
     setAvailableItems((prev) =>
@@ -114,14 +176,14 @@ export default function BuildingManagerResponsePage({ params }: { params: { toke
     )
   }
 
+  // In the handleSubmit function
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!selectedBuilding) {
-      toast({
+      warningToast({
         title: "請選擇大樓",
         description: "請選擇您所管理的大樓",
-        variant: "destructive",
       })
       return
     }
@@ -135,37 +197,34 @@ export default function BuildingManagerResponsePage({ params }: { params: { toke
 
       if (response.success) {
         setIsSubmitted(true)
-        toast({
+        successToast({
           title: "提交成功",
           description: "您的回覆已成功提交",
         })
       } else {
         // Handle different error codes
         if (response.error?.code === "EXPIRED") {
-          setError({
-            code: "EXPIRED",
-            message: "此填表連結已過期，請聯絡總務處重新發送連結",
+          errorToast({
+            title: "連結已過期",
+            description: "此填表連結已過期，請聯絡總務處重新發送連結",
           })
         } else if (response.error?.code === "VALIDATION_ERROR") {
-          toast({
+          warningToast({
             title: "驗證錯誤",
             description: response.error?.message || "請檢查填寫的數量是否正確",
-            variant: "destructive",
           })
         } else {
-          toast({
+          errorToast({
             title: "提交失敗",
             description: response.error?.message || "無法提交回覆，請稍後再試",
-            variant: "destructive",
           })
         }
       }
     } catch (error) {
       console.error("Failed to submit response:", error)
-      toast({
+      errorToast({
         title: "提交失敗",
         description: "無法提交回覆，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)
@@ -175,6 +234,11 @@ export default function BuildingManagerResponsePage({ params }: { params: { toke
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString("zh-TW")
+  }
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString)
+    return `${date.toLocaleDateString("zh-TW")} ${date.toLocaleTimeString("zh-TW")}`
   }
 
   if (isLoading) {
@@ -298,7 +362,7 @@ export default function BuildingManagerResponsePage({ params }: { params: { toke
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="building">請選擇您所管理的大樓</Label>
-                <Select value={selectedBuilding} onValueChange={setSelectedBuilding}>
+                <Select value={selectedBuilding} onValueChange={handleBuildingChange}>
                   <SelectTrigger id="building">
                     <SelectValue placeholder="選擇大樓" />
                   </SelectTrigger>
@@ -311,6 +375,18 @@ export default function BuildingManagerResponsePage({ params }: { params: { toke
                   </SelectContent>
                 </Select>
               </div>
+
+              {existingResponse && (
+                <div className="rounded-md border p-3 bg-blue-50 dark:bg-blue-950 flex items-start gap-2">
+                  <InfoIcon className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-700 dark:text-blue-300">已有現有回覆</p>
+                    <p className="text-blue-600 dark:text-blue-400">
+                      此大樓已於 {formatDateTime(existingResponse.submittedAt)} 提交過回覆，您可以修改數量後重新提交。
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>請填寫可提供的器材數量</Label>

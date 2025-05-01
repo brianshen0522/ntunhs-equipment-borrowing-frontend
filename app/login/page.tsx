@@ -15,6 +15,7 @@ import { RoleSelectionDialog } from "@/components/role-selection-dialog"
 import { ThemeSwitch } from "@/components/theme-switch"
 import { loginUser } from "@/lib/api/auth"
 import { THEME_STORAGE_KEY } from "@/components/theme-provider"
+import { errorToast } from "@/lib/utils/toast-helper"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -71,17 +72,32 @@ export default function LoginPage() {
           router.push(redirectUrl)
         }
       } else {
-        toast({
+        errorToast({
           title: "登入失敗",
           description: response.error?.message || "請檢查您的帳號密碼",
-          variant: "destructive",
         })
       }
     } catch (error) {
-      toast({
+      console.error("Login error:", error)
+      // Check if error has a response property that might contain our API error
+      let errorMessage = "連線伺服器時發生錯誤，請稍後再試"
+
+      if (error instanceof Error) {
+        // Try to parse the error message if it's JSON
+        try {
+          const errorData = JSON.parse(error.message)
+          if (errorData.detail && errorData.detail.error && errorData.detail.error.message) {
+            errorMessage = errorData.detail.error.message
+          }
+        } catch (e) {
+          // If parsing fails, use the original error message
+          errorMessage = error.message || errorMessage
+        }
+      }
+
+      errorToast({
         title: "登入失敗",
-        description: "連線伺服器時發生錯誤，請稍後再試",
-        variant: "destructive",
+        description: errorMessage,
       })
     } finally {
       setIsLoading(false)

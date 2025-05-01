@@ -2,46 +2,24 @@
 
 import type React from "react"
 
+import { useEffect } from "react"
 import { useTheme } from "next-themes"
-import { useEffect, useState } from "react"
+import { disableThemeTransitions, applyThemeTransition } from "@/lib/utils/theme-transition"
 
-export function ThemeTransitionProvider({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const [mounted, setMounted] = useState(false)
-  const { resolvedTheme } = useTheme()
-  const [transitioning, setTransitioning] = useState(false)
+export function ThemeTransitionProvider({ children }: { children: React.ReactNode }) {
+  const { theme, resolvedTheme } = useTheme()
 
-  // Handle initial mount
   useEffect(() => {
-    setMounted(true)
+    // Disable transitions on initial load
+    disableThemeTransitions()
   }, [])
 
-  // Handle theme transitions
   useEffect(() => {
-    if (!mounted) return
-
-    // Add transition class to body when theme changes
-    setTransitioning(true)
-
-    // Remove transition class after transition completes
-    const timer = setTimeout(() => {
-      setTransitioning(false)
-    }, 300) // Match this with the CSS transition duration
-
-    return () => clearTimeout(timer)
-  }, [resolvedTheme, mounted])
-
-  // Add transition class to body
-  useEffect(() => {
-    if (transitioning) {
-      document.documentElement.classList.add("theme-transition")
-    } else {
-      document.documentElement.classList.remove("theme-transition")
+    // Apply transition when theme changes
+    if (resolvedTheme) {
+      applyThemeTransition(document.documentElement)
     }
-  }, [transitioning])
+  }, [theme, resolvedTheme])
 
   return <>{children}</>
 }

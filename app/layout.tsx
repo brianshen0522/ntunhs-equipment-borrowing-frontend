@@ -7,9 +7,9 @@ import "./globals.css"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "NTUNHS 教務處器材借用管理系統",
-  description: "國立臺北護理健康大學教務處器材借用管理系統",
-    generator: 'v0.dev'
+  title: "NTUNHS 總務處器材借用管理系統",
+  description: "國立臺北護理健康大學總務處器材借用管理系統",
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -34,6 +34,16 @@ export default function RootLayout({
                   console.error('Failed to apply theme:', e);
                 }
               })();
+
+              // Prevent ServiceWorker registration in preview environments
+              if (window.location.hostname.includes('vusercontent.net')) {
+                window.addEventListener('error', function(event) {
+                  if (event.message && event.message.includes('ServiceWorker')) {
+                    event.preventDefault();
+                    console.warn('ServiceWorker registration prevented in preview environment');
+                  }
+                });
+              }
             `,
           }}
         />

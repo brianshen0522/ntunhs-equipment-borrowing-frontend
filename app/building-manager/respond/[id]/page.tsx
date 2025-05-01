@@ -10,11 +10,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useToast } from "@/components/ui/use-toast"
 import { Loader2, AlertTriangle, CheckCircle, ClipboardList } from "lucide-react"
 import { ThemeSwitch } from "@/components/theme-switch"
 import { getRequestForBuildingManager, submitBuildingResponse } from "@/lib/api/building-responses"
 import type { BuildingResponseItem } from "@/lib/api/building-responses"
+import { successToast, errorToast, warningToast } from "@/lib/utils/toast-helper"
 
 export default function BuildingManagerResponsePage({ params }: { params: { id: string } }) {
   // Unwrap params using React.use()
@@ -23,7 +23,6 @@ export default function BuildingManagerResponsePage({ params }: { params: { id: 
 
   // Inside your component, add:
   const { theme } = useThemePersistence()
-  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
@@ -93,10 +92,9 @@ export default function BuildingManagerResponsePage({ params }: { params: { id: 
     e.preventDefault()
 
     if (!selectedBuilding) {
-      toast({
+      warningToast({
         title: "請選擇大樓",
         description: "請選擇您所管理的大樓",
-        variant: "destructive",
       })
       return
     }
@@ -110,23 +108,21 @@ export default function BuildingManagerResponsePage({ params }: { params: { id: 
 
       if (response.success) {
         setIsSubmitted(true)
-        toast({
+        successToast({
           title: "提交成功",
           description: "您的回覆已成功提交",
         })
       } else {
-        toast({
+        errorToast({
           title: "提交失敗",
           description: response.error?.message || "無法提交回覆，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to submit response:", error)
-      toast({
+      errorToast({
         title: "提交失敗",
         description: "無法提交回覆，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)

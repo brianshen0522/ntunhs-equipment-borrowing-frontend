@@ -52,7 +52,20 @@ export async function getBuildingsList(include_disabled = false): Promise<Buildi
       },
     })
 
-    return await response.json()
+    const data = await response.json()
+
+    // Handle the new error format
+    if (data.detail && !data.detail.success) {
+      return {
+        success: false,
+        error: data.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
+
+    return data
   } catch (error) {
     console.error("Get buildings list error:", error)
     return {
@@ -87,7 +100,20 @@ export async function createBuilding(params: CreateBuildingParams): Promise<Buil
       body: JSON.stringify(params),
     })
 
-    return await response.json()
+    const data = await response.json()
+
+    // Handle the new error format
+    if (data.detail && !data.detail.success) {
+      return {
+        success: false,
+        error: data.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
+
+    return data
   } catch (error) {
     console.error("Create building error:", error)
     return {

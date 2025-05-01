@@ -56,7 +56,20 @@ export async function getEquipmentsList(include_disabled = false): Promise<Equip
       },
     })
 
-    return await response.json()
+    const data = await response.json()
+
+    // Handle the new error format
+    if (data.detail && !data.detail.success) {
+      return {
+        success: false,
+        error: data.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
+
+    return data
   } catch (error) {
     console.error("Get equipments list error:", error)
     return {
@@ -91,7 +104,20 @@ export async function createEquipment(params: CreateEquipmentParams): Promise<Eq
       body: JSON.stringify(params),
     })
 
-    return await response.json()
+    const data = await response.json()
+
+    // Handle the new error format
+    if (data.detail && !data.detail.success) {
+      return {
+        success: false,
+        error: data.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
+
+    return data
   } catch (error) {
     console.error("Create equipment error:", error)
     return {

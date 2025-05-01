@@ -16,6 +16,9 @@ import { getEquipmentsList } from "@/lib/api/equipments"
 import { createRequest } from "@/lib/api/requests"
 import type { Equipment } from "@/lib/types"
 
+// First, add the import for toast helper functions
+import { successToast, errorToast } from "@/lib/utils/toast-helper"
+
 export default function NewRequestPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -84,16 +87,35 @@ export default function NewRequestPage() {
     setItems(newItems)
   }
 
+  // Enhance the calculateMinStartDate function to ensure it correctly calculates T+2
+  const calculateMinStartDate = () => {
+    const today = new Date()
+    const minDate = new Date(today)
+    minDate.setDate(today.getDate() + 2) // Add 2 days to today (T+2)
+    return minDate.toISOString().split("T")[0] // Format as YYYY-MM-DD
+  }
+
+  // Enhance the handleSubmit function to add an explicit validation for the T+2 rule
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
     // Validate form
     if (!startDate || !endDate || !venue || !purpose) {
-      toast({
+      errorToast({
         title: "表單不完整",
         description: "請填寫所有必填欄位",
-        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    // Validate T+2 rule
+    const minStartDateCalculated = calculateMinStartDate()
+    if (startDate < minStartDateCalculated) {
+      errorToast({
+        title: "日期錯誤",
+        description: `借用開始日期必須至少為 ${formatDateForDisplay(minStartDateCalculated)} (T+2)`,
       })
       setIsSubmitting(false)
       return
@@ -102,10 +124,9 @@ export default function NewRequestPage() {
     // Validate items
     const validItems = items.filter((item) => item.equipmentId && item.quantity > 0)
     if (validItems.length === 0) {
-      toast({
+      errorToast({
         title: "表單不完整",
         description: "請至少選擇一項器材",
-        variant: "destructive",
       })
       setIsSubmitting(false)
       return
@@ -121,17 +142,16 @@ export default function NewRequestPage() {
       })
 
       if (response.success) {
-        toast({
+        successToast({
           title: "申請成功",
           description: "您的器材借用申請已提交",
         })
         router.push(`/applicant/requests/${response.data.requestId}`)
       } else {
         // Display the specific error message from the server
-        toast({
+        errorToast({
           title: "申請失敗",
           description: response.error?.message || "無法提交申請，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
@@ -140,11 +160,13 @@ export default function NewRequestPage() {
       // Try to extract error message if it's a string representation of JSON
       let errorMessage = "無法提交申請，請稍後再試"
 
-      if (error instanceof Error && error.message) {
+      if (error instanceof Error) {
         try {
           // Try to parse the error message as JSON
           const errorData = JSON.parse(error.message)
-          if (errorData.detail && Array.isArray(errorData.detail)) {
+          if (errorData.detail && errorData.detail.error && errorData.detail.error.message) {
+            errorMessage = errorData.detail.error.message
+          } else if (errorData.detail && Array.isArray(errorData.detail)) {
             const messages = errorData.detail.map((item: any) => item.msg).filter(Boolean)
             if (messages.length > 0) {
               errorMessage = messages.join("; ")
@@ -152,14 +174,13 @@ export default function NewRequestPage() {
           }
         } catch (e) {
           // If parsing fails, just use the error message directly
-          errorMessage = error.message
+          errorMessage = error.message || errorMessage
         }
       }
 
-      toast({
+      errorToast({
         title: "申請失敗",
         description: errorMessage,
-        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)
@@ -167,13 +188,6 @@ export default function NewRequestPage() {
   }
 
   // Calculate minimum start date (T+2)
-  const calculateMinStartDate = () => {
-    const today = new Date()
-    const minDate = new Date(today)
-    minDate.setDate(today.getDate() + 2) // Add 2 days to today
-    return minDate.toISOString().split("T")[0] // Format as YYYY-MM-DD
-  }
-
   const minStartDate = calculateMinStartDate()
 
   // Format date for display
@@ -207,8 +221,8 @@ export default function NewRequestPage() {
                   min={minStartDate}
                   required
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  借用開始日期必須至少為 {formatDateForDisplay(minStartDate)} (T+2)
+                <p className="text-xs font-medium text-amber-600 mt-1">
+                  重要: 借用開始日期必須至少為 {formatDateForDisplay(minStartDate)} (T+2)
                 </p>
               </div>
               <div className="space-y-2">

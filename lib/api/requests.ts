@@ -116,7 +116,20 @@ export async function getRequestsList(params: RequestsListParams = {}): Promise<
       },
     })
 
-    return await response.json()
+    const data = await response.json()
+
+    // Handle the new error format
+    if (data.detail && !data.detail.success) {
+      return {
+        success: false,
+        error: data.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
+
+    return data
   } catch (error) {
     console.error("Get requests list error:", error)
     return {
@@ -184,19 +197,27 @@ export async function createRequest(params: CreateRequestParams): Promise<Create
       body: JSON.stringify(params),
     })
 
-    const responseData = await response.json()
+    const data = await response.json()
+
+    // Handle the new error format
+    if (data.detail && !data.detail.success) {
+      return {
+        success: false,
+        error: data.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
 
     // If the response is successful, return it directly
     if (response.ok) {
-      return responseData
+      return data
     }
 
-    // If the response is not successful, handle the error
-    console.error("Server error response:", responseData)
-
     // Check for FastAPI validation error format
-    if (responseData.detail && Array.isArray(responseData.detail)) {
-      const errorMessages = responseData.detail
+    if (data.detail && Array.isArray(data.detail)) {
+      const errorMessages = data.detail
         .map((err: any) => err.msg)
         .filter(Boolean)
         .join("; ")
@@ -206,7 +227,7 @@ export async function createRequest(params: CreateRequestParams): Promise<Create
         error: {
           code: "VALIDATION_ERROR",
           message: errorMessages || "表單驗證失敗",
-          details: responseData,
+          details: data,
         },
       }
     }
@@ -215,9 +236,9 @@ export async function createRequest(params: CreateRequestParams): Promise<Create
     return {
       success: false,
       error: {
-        code: responseData.code || "REQUEST_FAILED",
-        message: responseData.message || "申請失敗",
-        details: responseData,
+        code: data.code || "REQUEST_FAILED",
+        message: data.message || "申請失敗",
+        details: data,
       },
     }
   } catch (error) {

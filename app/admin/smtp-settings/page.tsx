@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { getSmtpSettings, updateSmtpSettings, testSmtp, type SmtpSettings } from "@/lib/api/admin"
+import { getSystemParameters, updateSystemParameters, type SystemParameters } from "@/lib/api/admin"
+import { successToast, errorToast, warningToast } from "@/lib/utils/toast-helper"
 
 export default function SmtpSettingsPage() {
   const { toast } = useToast()
@@ -28,6 +30,16 @@ export default function SmtpSettingsPage() {
       },
     },
   })
+  const [systemSettings, setSystemSettings] = useState<SystemParameters>({
+    parameters: {
+      requestExpiryDays: 30,
+      responseFormValidityHours: 48,
+      maxItemsPerRequest: 10,
+      enableEmailNotifications: true,
+      enableLineNotifications: true,
+      systemMaintenanceMode: false,
+    },
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
@@ -37,22 +49,30 @@ export default function SmtpSettingsPage() {
     const fetchSettings = async () => {
       setIsLoading(true)
       try {
-        const response = await getSmtpSettings()
-        if (response.success && response.data) {
-          setSettings(response.data)
+        const [smtpResponse, systemResponse] = await Promise.all([getSmtpSettings(), getSystemParameters()])
+
+        if (smtpResponse.success && smtpResponse.data) {
+          setSettings(smtpResponse.data)
         } else {
-          toast({
+          errorToast({
             title: "錯誤",
-            description: response.error?.message || "無法獲取 SMTP 設定",
-            variant: "destructive",
+            description: smtpResponse.error?.message || "無法獲取 SMTP 設定",
+          })
+        }
+
+        if (systemResponse.success && systemResponse.data) {
+          setSystemSettings(systemResponse.data)
+        } else {
+          errorToast({
+            title: "錯誤",
+            description: systemResponse.error?.message || "無法獲取系統參數",
           })
         }
       } catch (error) {
-        console.error("Failed to fetch SMTP settings:", error)
-        toast({
+        console.error("Failed to fetch settings:", error)
+        errorToast({
           title: "錯誤",
-          description: "無法獲取 SMTP 設定",
-          variant: "destructive",
+          description: "無法獲取設定",
         })
       } finally {
         setIsLoading(false)
@@ -65,25 +85,27 @@ export default function SmtpSettingsPage() {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const response = await updateSmtpSettings(settings)
-      if (response.success) {
-        toast({
+      const [smtpResponse, systemResponse] = await Promise.all([
+        updateSmtpSettings(settings),
+        updateSystemParameters(systemSettings),
+      ])
+
+      if (smtpResponse.success && systemResponse.success) {
+        successToast({
           title: "成功",
-          description: "SMTP 設定已更新",
+          description: "郵件設定已更新",
         })
       } else {
-        toast({
+        errorToast({
           title: "錯誤",
-          description: response.error?.message || "無法更新 SMTP 設定",
-          variant: "destructive",
+          description: smtpResponse.error?.message || systemResponse.error?.message || "無法更新設定",
         })
       }
     } catch (error) {
-      console.error("Failed to update SMTP settings:", error)
-      toast({
+      console.error("Failed to update settings:", error)
+      errorToast({
         title: "錯誤",
-        description: "無法更新 SMTP 設定",
-        variant: "destructive",
+        description: "無法更新設定",
       })
     } finally {
       setIsSaving(false)
@@ -92,10 +114,9 @@ export default function SmtpSettingsPage() {
 
   const handleTest = async () => {
     if (!testEmail) {
-      toast({
+      warningToast({
         title: "錯誤",
         description: "請輸入測試郵件地址",
-        variant: "destructive",
       })
       return
     }
@@ -105,30 +126,27 @@ export default function SmtpSettingsPage() {
       const response = await testSmtp({ testEmail })
       if (response.success && response.data) {
         if (response.data.connectionStatus === "success" && response.data.messageSent) {
-          toast({
+          successToast({
             title: "成功",
             description: `測試郵件已發送至 ${response.data.recipientEmail}`,
           })
         } else {
-          toast({
+          errorToast({
             title: "錯誤",
             description: "SMTP 連接測試失敗",
-            variant: "destructive",
           })
         }
       } else {
-        toast({
+        errorToast({
           title: "錯誤",
           description: response.error?.message || "SMTP 連接測試失敗",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to test SMTP connection:", error)
-      toast({
+      errorToast({
         title: "錯誤",
         description: "SMTP 連接測試失敗",
-        variant: "destructive",
       })
     } finally {
       setIsTesting(false)
@@ -165,6 +183,16 @@ export default function SmtpSettingsPage() {
     })
   }
 
+  const handleSystemSettingChange = (field: string, value: any) => {
+    setSystemSettings((prev) => ({
+      ...prev,
+      parameters: {
+        ...prev.parameters,
+        [field]: value,
+      },
+    }))
+  }
+
   if (isLoading) {
     return <div className="flex h-full items-center justify-center">載入中...</div>
   }
@@ -177,7 +205,7 @@ export default function SmtpSettingsPage() {
 
       <Tabs defaultValue="connection">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="connection">連接設定</TabsTrigger>
+          <TabsTrigger value="connection">連接與通知設定</TabsTrigger>
           <TabsTrigger value="templates">郵件範本</TabsTrigger>
         </TabsList>
 
@@ -275,6 +303,22 @@ export default function SmtpSettingsPage() {
                     {isTesting ? "測試中..." : "發送測試郵件"}
                   </Button>
                 </div>
+              </div>
+              <div className="mt-8 border-t pt-6">
+                <h3 className="text-lg font-medium">郵件通知設定</h3>
+                <p className="text-sm text-muted-foreground mb-4">設定系統郵件通知功能</p>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="enableEmailNotifications"
+                    checked={systemSettings.parameters.enableEmailNotifications}
+                    onCheckedChange={(checked) => handleSystemSettingChange("enableEmailNotifications", checked)}
+                  />
+                  <Label htmlFor="enableEmailNotifications">啟用電子郵件通知</Label>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  啟用後，系統將會在申請狀態變更時發送電子郵件通知給相關人員
+                </p>
               </div>
             </CardContent>
             <CardFooter className="flex justify-end">

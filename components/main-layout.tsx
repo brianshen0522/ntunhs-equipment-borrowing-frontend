@@ -16,7 +16,6 @@ import {
   User,
   LogOut,
   ChevronDown,
-  Home,
   ClipboardList,
   Building2,
   Package,
@@ -26,6 +25,7 @@ import {
 import { cn } from "@/lib/utils"
 import { getUserInfo, logoutUser } from "@/lib/api/auth"
 import type { UserInfo } from "@/lib/types"
+import Image from "next/image"
 
 interface MainLayoutProps {
   children: React.ReactNode
@@ -210,7 +210,13 @@ export function MainLayout({ children }: MainLayoutProps) {
               <SheetContent side="left" className="w-64 p-0">
                 <div className="p-4 border-b">
                   <div className="flex items-center gap-2">
-                    <Home className="h-5 w-5" />
+                    <Image
+                      src="/images/ntunhs_icon.png"
+                      alt="NTUNHS Logo"
+                      width={24}
+                      height={24}
+                      className="h-6 w-auto"
+                    />
                     <span className="font-semibold">總務處器材借用系統</span>
                   </div>
                 </div>
@@ -233,9 +239,9 @@ export function MainLayout({ children }: MainLayoutProps) {
               </SheetContent>
             </Sheet>
             <div className="flex items-center gap-2">
-              <Home className="h-6 w-6 hidden sm:block" />
-              <Link href={getHomeRoute()} className="text-base sm:text-lg font-semibold truncate">
-                總務處器材借用系統
+              <Link href={getHomeRoute()} className="flex items-center gap-2">
+                <Image src="/images/ntunhs_icon.png" alt="NTUNHS Logo" width={32} height={32} className="h-8 w-auto" />
+                <span className="text-base sm:text-lg font-semibold truncate">總務處器材借用系統</span>
               </Link>
             </div>
           </div>

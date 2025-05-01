@@ -26,6 +26,17 @@ export interface BuildingResponseSubmitResponse {
   }
 }
 
+export interface BuildingResponse {
+  buildingId: string
+  buildingName: string
+  items: Array<{
+    itemId: string
+    equipmentName: string
+    availableQuantity: number
+  }>
+  submittedAt: string
+}
+
 export interface GetRequestForBuildingManagerResponse {
   success: boolean
   data?: {
@@ -50,6 +61,7 @@ export interface GetRequestForBuildingManagerResponse {
       buildingId: string | null
       items: Array<any>
     }
+    allBuildingResponses?: BuildingResponse[]
   }
   error?: {
     code: string
@@ -58,6 +70,22 @@ export interface GetRequestForBuildingManagerResponse {
   }
 }
 
+// Add a helper function to extract error message from the new error format
+function extractErrorMessage(data: any): { code?: string; message: string } {
+  if (data.detail && !data.detail.success && data.detail.error) {
+    return {
+      code: data.detail.error.code,
+      message: data.detail.error.message,
+    }
+  }
+
+  return {
+    code: "UNKNOWN_ERROR",
+    message: "未知錯誤，請稍後再試",
+  }
+}
+
+// Update the getRequestForBuildingManager function to use the correct endpoint
 export async function getRequestForBuildingManager(
   responseToken: string,
 ): Promise<GetRequestForBuildingManagerResponse> {
@@ -66,7 +94,20 @@ export async function getRequestForBuildingManager(
       method: "GET",
     })
 
-    return await response.json()
+    const data = await response.json()
+
+    // Handle the new error format
+    if (data.detail && !data.detail.success) {
+      return {
+        success: false,
+        error: data.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
+
+    return data
   } catch (error) {
     console.error("Get request for building manager error:", error)
     return {
@@ -79,6 +120,7 @@ export async function getRequestForBuildingManager(
   }
 }
 
+// Also update the submitBuildingResponse function to use the correct endpoint
 export async function submitBuildingResponse(
   responseToken: string,
   params: SubmitBuildingResponseParams,
@@ -92,7 +134,20 @@ export async function submitBuildingResponse(
       body: JSON.stringify(params),
     })
 
-    return await response.json()
+    const responseData = await response.json()
+
+    // Handle the new error format
+    if (responseData.detail && !responseData.detail.success) {
+      return {
+        success: false,
+        error: responseData.detail.error || {
+          code: "UNKNOWN_ERROR",
+          message: "未知錯誤，請稍後再試",
+        },
+      }
+    }
+
+    return responseData
   } catch (error) {
     console.error("Submit building response error:", error)
     return {

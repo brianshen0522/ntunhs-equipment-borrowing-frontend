@@ -37,6 +37,11 @@ import {
 } from "@/lib/api/equipments"
 import type { Equipment } from "@/lib/types"
 
+// Update the equipments management page to use the toast helper functions
+
+// First, add the import for toast helper functions
+import { successToast, errorToast, warningToast } from "@/lib/utils/toast-helper"
+
 export default function EquipmentsPage() {
   const { toast } = useToast()
   const [equipments, setEquipments] = useState<Equipment[]>([])
@@ -62,18 +67,16 @@ export default function EquipmentsPage() {
       if (response.success) {
         setEquipments(response.data.equipments)
       } else {
-        toast({
+        errorToast({
           title: "錯誤",
           description: "無法獲取器材列表，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to fetch equipments:", error)
-      toast({
+      errorToast({
         title: "錯誤",
         description: "無法獲取器材列表，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsLoading(false)
@@ -86,10 +89,9 @@ export default function EquipmentsPage() {
 
   const handleAddEquipment = async () => {
     if (!newEquipmentName.trim()) {
-      toast({
+      warningToast({
         title: "請輸入器材名稱",
         description: "器材名稱不能為空",
-        variant: "destructive",
       })
       return
     }
@@ -101,7 +103,7 @@ export default function EquipmentsPage() {
         description: newEquipmentDescription || undefined,
       })
       if (response.success) {
-        toast({
+        successToast({
           title: "新增成功",
           description: "器材已成功新增",
         })
@@ -110,18 +112,16 @@ export default function EquipmentsPage() {
         setShowAddDialog(false)
         fetchEquipments()
       } else {
-        toast({
+        errorToast({
           title: "新增失敗",
           description: response.error?.message || "無法新增器材，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to add equipment:", error)
-      toast({
+      errorToast({
         title: "新增失敗",
         description: "無法新增器材，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)
@@ -130,10 +130,9 @@ export default function EquipmentsPage() {
 
   const handleEditEquipment = async () => {
     if (!editEquipmentName.trim()) {
-      toast({
+      warningToast({
         title: "請輸入器材名稱",
         description: "器材名稱不能為空",
-        variant: "destructive",
       })
       return
     }
@@ -145,25 +144,23 @@ export default function EquipmentsPage() {
         description: editEquipmentDescription || undefined,
       })
       if (response.success) {
-        toast({
+        successToast({
           title: "更新成功",
           description: "器材資訊已成功更新",
         })
         setShowEditDialog(false)
         fetchEquipments()
       } else {
-        toast({
+        errorToast({
           title: "更新失敗",
           description: response.error?.message || "無法更新器材資訊，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to update equipment:", error)
-      toast({
+      errorToast({
         title: "更新失敗",
         description: "無法更新器材資訊，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)
@@ -174,24 +171,22 @@ export default function EquipmentsPage() {
     try {
       const response = await toggleEquipmentStatus(equipmentId, enabled)
       if (response.success) {
-        toast({
+        successToast({
           title: enabled ? "已啟用" : "已停用",
           description: `器材已成功${enabled ? "啟用" : "停用"}`,
         })
         fetchEquipments()
       } else {
-        toast({
+        errorToast({
           title: "操作失敗",
           description: response.error?.message || "無法更改器材狀態，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to toggle equipment status:", error)
-      toast({
+      errorToast({
         title: "操作失敗",
         description: "無法更改器材狀態，請稍後再試",
-        variant: "destructive",
       })
     }
   }
@@ -201,25 +196,23 @@ export default function EquipmentsPage() {
     try {
       const response = await deleteEquipment(deleteEquipmentId)
       if (response.success) {
-        toast({
+        successToast({
           title: "刪除成功",
           description: "器材已成功刪除",
         })
         setShowDeleteDialog(false)
         fetchEquipments()
       } else {
-        toast({
+        errorToast({
           title: "刪除失敗",
           description: response.error?.message || "無法刪除器材，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to delete equipment:", error)
-      toast({
+      errorToast({
         title: "刪除失敗",
         description: "無法刪除器材，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsSubmitting(false)

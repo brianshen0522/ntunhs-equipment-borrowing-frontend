@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/components/ui/use-toast"
 import { Search, MoreHorizontal, UserPlus, UserMinus } from "lucide-react"
 import { getUsers, manageUserRole, type User } from "@/lib/api/admin"
+import { successToast, errorToast } from "@/lib/utils/toast-helper"
 
 export default function UsersPage() {
   const { toast } = useToast()
@@ -40,18 +41,16 @@ export default function UsersPage() {
         setUsers(response.data.users)
         setTotal(response.data.total)
       } else {
-        toast({
+        errorToast({
           title: "錯誤",
           description: response.error?.message || "無法獲取使用者列表",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to fetch users:", error)
-      toast({
+      errorToast({
         title: "錯誤",
         description: "無法獲取使用者列表",
-        variant: "destructive",
       })
     } finally {
       setIsLoading(false)
@@ -71,7 +70,7 @@ export default function UsersPage() {
     try {
       const response = await manageUserRole(userId, { action, role })
       if (response.success) {
-        toast({
+        successToast({
           title: "成功",
           description: `已${action === "grant" ? "授予" : "撤銷"}使用者角色`,
         })
@@ -87,18 +86,16 @@ export default function UsersPage() {
           ),
         )
       } else {
-        toast({
+        errorToast({
           title: "錯誤",
           description: response.error?.message || "無法更新使用者角色",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to manage user role:", error)
-      toast({
+      errorToast({
         title: "錯誤",
         description: "無法更新使用者角色",
-        variant: "destructive",
       })
     }
   }

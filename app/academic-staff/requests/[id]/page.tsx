@@ -11,7 +11,6 @@ import { Loader2, FileText, AlertTriangle, Clock, CheckCircle, XCircle, Send, Cl
 import {
   getRequestDetails,
   approveInquiry,
-  rejectRequest,
   getBuildingResponses,
   allocateEquipment,
   resendEmail,
@@ -19,6 +18,11 @@ import {
 import type { RequestDetail, BuildingResponse, TotalAvailable } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { API_BASE_URL } from "@/lib/config"
+// Update the academic staff request detail page to use the toast helper functions
+
+// First, add the import for toast helper functions
+import { successToast, errorToast, warningToast } from "@/lib/utils/toast-helper"
 
 export default function RequestDetailPage({ params }: { params: { id: string } }) {
   // Unwrap params using React.use()
@@ -49,6 +53,7 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
   const [allocationNotes, setAllocationNotes] = useState("")
   const [inquiryFormLink, setInquiryFormLink] = useState<string | null>(null)
 
+  // In the useEffect for fetchRequestDetails
   useEffect(() => {
     const fetchRequestDetails = async () => {
       try {
@@ -57,8 +62,11 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
         if (response.success) {
           setRequest(response.data)
 
-          // Generate inquiry form link if the request is in pending_building_response status
-          if (response.data.status === "pending_building_response" && response.data.responseTokens?.length > 0) {
+          // Generate inquiry form link if the request is in pending_building_response or pending_allocation status
+          if (
+            (response.data.status === "pending_building_response" || response.data.status === "pending_allocation") &&
+            response.data.responseTokens?.length > 0
+          ) {
             const baseUrl = window.location.origin
             // Use the token from the first response token in the array
             const token = response.data.responseTokens[0].token
@@ -73,19 +81,17 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
             fetchBuildingResponses()
           }
         } else {
-          toast({
+          errorToast({
             title: "錯誤",
             description: "無法獲取申請詳情，請稍後再試",
-            variant: "destructive",
           })
           router.push("/academic-staff/requests")
         }
       } catch (error) {
         console.error("Failed to fetch request details:", error)
-        toast({
+        errorToast({
           title: "錯誤",
           description: "無法獲取申請詳情，請稍後再試",
-          variant: "destructive",
         })
         router.push("/academic-staff/requests")
       } finally {
@@ -96,6 +102,7 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
     fetchRequestDetails()
   }, [requestId, router, toast])
 
+  // In the fetchBuildingResponses function
   const fetchBuildingResponses = async () => {
     setIsLoadingResponses(true)
     try {
@@ -124,37 +131,36 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
 
         setAllocations(initialAllocations)
       } else {
-        toast({
+        errorToast({
           title: "錯誤",
           description: "無法獲取大樓回覆資料，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to fetch building responses:", error)
-      toast({
+      errorToast({
         title: "錯誤",
         description: "無法獲取大樓回覆資料，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsLoadingResponses(false)
     }
   }
 
+  // In the handleApproveInquiry function
   const handleApproveInquiry = async () => {
     setIsApproving(true)
     try {
       const response = await approveInquiry(requestId)
 
       if (response.success) {
-        toast({
+        successToast({
           title: "已同意詢問",
           description: "已成功發送詢問給大樓管理員",
         })
 
         // Fetch the updated request details to get the latest data including response tokens
-        const updatedRequestResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/requests/${requestId}`, {
+        const updatedRequestResponse = await fetch(`${API_BASE_URL}/requests/${requestId}`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -176,64 +182,80 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
           }
         }
       } else {
-        toast({
+        errorToast({
           title: "操作失敗",
           description: response.error?.message || "無法完成操作，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to approve inquiry:", error)
-      toast({
+      errorToast({
         title: "操作失敗",
         description: "無法完成操作，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsApproving(false)
     }
   }
 
+  // In the copyLinkToClipboard function
   const copyLinkToClipboard = () => {
     if (inquiryFormLink) {
       navigator.clipboard.writeText(inquiryFormLink).then(
         () => {
-          toast({
+          successToast({
             title: "已複製連結",
             description: "詢問表單連結已複製到剪貼簿",
           })
         },
         (err) => {
           console.error("Could not copy text: ", err)
-          toast({
+          errorToast({
             title: "複製失敗",
             description: "無法複製連結，請手動選取並複製",
-            variant: "destructive",
           })
         },
       )
     }
   }
 
+  // In the handleRejectRequest function
   const handleRejectRequest = async () => {
     if (!rejectReason.trim()) {
-      toast({
+      warningToast({
         title: "請輸入駁回原因",
         description: "請提供駁回申請的原因",
-        variant: "destructive",
       })
       return
     }
 
-    console.log("Rejecting request with reason:", rejectReason)
     setIsRejecting(true)
     try {
-      console.log("Calling API to reject request:", requestId)
-      const response = await rejectRequest(requestId, rejectReason)
-      console.log("Rejection API response:", response)
+      // Direct API call to ensure proper request format
+      const token = localStorage.getItem("token")
+      if (!token) {
+        errorToast({
+          title: "未登入",
+          description: "請重新登入後再試",
+        })
+        setIsRejecting(false)
+        return
+      }
 
-      if (response.success) {
-        toast({
+      // Use the correct API URL directly
+      const response = await fetch(`${API_BASE_URL}/requests/${requestId}/reject`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ reason: rejectReason }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        successToast({
           title: "已駁回申請",
           description: "申請已成功駁回",
         })
@@ -244,48 +266,31 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
           setRequest(updatedResponse.data)
         }
       } else {
-        // Handle specific error codes
-        if (response.error?.code === "INVALID_STATE") {
-          toast({
-            title: "操作失敗",
-            description: "只能駁回待審核狀態的申請",
-            variant: "destructive",
-          })
-        } else if (response.error?.code === "INVALID_REQUEST") {
-          toast({
-            title: "操作失敗",
-            description: "駁回原因為必填項",
-            variant: "destructive",
-          })
-        } else {
-          toast({
-            title: "操作失敗",
-            description: response.error?.message || "無法完成操作，請稍後再試",
-            variant: "destructive",
-          })
-        }
+        errorToast({
+          title: "操作失敗",
+          description: data.error?.message || "無法完成操作，請稍後再試",
+        })
       }
     } catch (error) {
       console.error("Failed to reject request:", error)
-      toast({
+      errorToast({
         title: "操作失敗",
         description: "無法完成操作，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsRejecting(false)
     }
   }
 
+  // In the handleAllocateEquipment function
   const handleAllocateEquipment = async () => {
     // Validate allocations
     for (const allocation of allocations) {
       const totalAllocated = allocation.buildingAllocations.reduce((sum, ba) => sum + ba.allocatedQuantity, 0)
       if (totalAllocated !== allocation.approvedQuantity) {
-        toast({
+        warningToast({
           title: "分配數量錯誤",
           description: `${request?.items.find((i) => i.itemId === allocation.itemId)?.equipmentName} 的分配總數必須等於核准數量`,
-          variant: "destructive",
         })
         return
       }
@@ -296,7 +301,7 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
       const response = await allocateEquipment(requestId, allocations, allocationNotes || undefined)
 
       if (response.success) {
-        toast({
+        successToast({
           title: "分配成功",
           description: "器材已成功分配，並已發送借用單給申請人",
         })
@@ -307,47 +312,44 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
           setRequest(updatedResponse.data)
         }
       } else {
-        toast({
+        errorToast({
           title: "操作失敗",
           description: response.error?.message || "無法完成操作，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to allocate equipment:", error)
-      toast({
+      errorToast({
         title: "操作失敗",
         description: "無法完成操作，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsAllocating(false)
     }
   }
 
+  // In the handleResendEmail function
   const handleResendEmail = async () => {
     setIsResendingEmail(true)
     try {
       const response = await resendEmail(requestId)
 
       if (response.success) {
-        toast({
+        successToast({
           title: "郵件已重新發送",
           description: `已成功重新發送借用單至 ${response.data.sentTo}`,
         })
       } else {
-        toast({
+        errorToast({
           title: "操作失敗",
           description: response.error?.message || "無法完成操作，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to resend email:", error)
-      toast({
+      errorToast({
         title: "操作失敗",
         description: "無法完成操作，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsResendingEmail(false)
@@ -567,81 +569,7 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
                   />
                 </div>
                 <div className="flex justify-between">
-                  <Button
-                    variant="destructive"
-                    onClick={() => {
-                      console.log("Direct reject button clicked")
-                      console.log("Reject reason:", rejectReason)
-
-                      if (!rejectReason.trim()) {
-                        toast({
-                          title: "請輸入駁回原因",
-                          description: "請提供駁回申請的原因",
-                          variant: "destructive",
-                        })
-                        return
-                      }
-
-                      setIsRejecting(true)
-
-                      // Direct API call without using the helper function
-                      const token = localStorage.getItem("token")
-                      if (!token) {
-                        toast({
-                          title: "未登入",
-                          description: "請重新登入後再試",
-                          variant: "destructive",
-                        })
-                        setIsRejecting(false)
-                        return
-                      }
-
-                      console.log("Making direct API call to reject request")
-                      fetch(`${process.env.NEXT_PUBLIC_API_URL}/requests/${requestId}/reject`, {
-                        method: "POST",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${token}`,
-                        },
-                        body: JSON.stringify({ reason: rejectReason }),
-                      })
-                        .then((response) => response.json())
-                        .then((data) => {
-                          console.log("API response:", data)
-                          if (data.success) {
-                            toast({
-                              title: "已駁回申請",
-                              description: "申請已成功駁回",
-                            })
-
-                            // Refresh the request details
-                            getRequestDetails(requestId).then((updatedResponse) => {
-                              if (updatedResponse.success) {
-                                setRequest(updatedResponse.data)
-                              }
-                            })
-                          } else {
-                            toast({
-                              title: "操作失敗",
-                              description: data.error?.message || "無法完成操作，請稍後再試",
-                              variant: "destructive",
-                            })
-                          }
-                        })
-                        .catch((error) => {
-                          console.error("API call error:", error)
-                          toast({
-                            title: "操作失敗",
-                            description: "無法完成操作，請稍後再試",
-                            variant: "destructive",
-                          })
-                        })
-                        .finally(() => {
-                          setIsRejecting(false)
-                        })
-                    }}
-                    disabled={isRejecting}
-                  >
+                  <Button variant="destructive" onClick={handleRejectRequest} disabled={isRejecting}>
                     {isRejecting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -666,19 +594,20 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
             </CardFooter>
           )}
 
-          {/* Show inquiry form link if status is pending_building_response */}
-          {request.status === "pending_building_response" && inquiryFormLink && (
-            <CardFooter className="flex flex-col items-start space-y-2 border-t pt-4">
-              <p className="text-sm font-medium">詢問表單連結：</p>
-              <div className="flex w-full items-center gap-2">
-                <Input value={inquiryFormLink} readOnly className="flex-1 bg-muted" />
-                <Button variant="outline" size="icon" onClick={copyLinkToClipboard} title="複製連結">
-                  <ClipboardCopy className="h-4 w-4" />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">請將此連結分享給大樓管理員，以便他們填寫器材可用數量。</p>
-            </CardFooter>
-          )}
+          {/* Show inquiry form link if status is pending_building_response or pending_allocation */}
+          {(request.status === "pending_building_response" || request.status === "pending_allocation") &&
+            inquiryFormLink && (
+              <CardFooter className="flex flex-col items-start space-y-2 border-t pt-4">
+                <p className="text-sm font-medium">詢問表單連結：</p>
+                <div className="flex w-full items-center gap-2">
+                  <Input value={inquiryFormLink} readOnly className="flex-1 bg-muted" />
+                  <Button variant="outline" size="icon" onClick={copyLinkToClipboard} title="複製連結">
+                    <ClipboardCopy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">請將此連結分享給大樓管理員，以便他們填寫器材可用數量。</p>
+              </CardFooter>
+            )}
         </Card>
 
         <div className="space-y-6">
@@ -887,6 +816,7 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
                   </div>
                 )}
               </TabsContent>
+
               <TabsContent value="allocation">
                 {buildingResponses.length > 0 ? (
                   <div className="space-y-6">
@@ -938,71 +868,130 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
                     </div>
 
                     <h3 className="text-lg font-medium">大樓分配詳情</h3>
-                    {allocations.map((allocation) => {
-                      const item = totalAvailable.find((i) => i.itemId === allocation.itemId)
-                      if (!item || allocation.approvedQuantity === 0) return null
 
-                      const totalAllocated = allocation.buildingAllocations.reduce(
-                        (sum, ba) => sum + ba.allocatedQuantity,
-                        0,
-                      )
-                      const remaining = allocation.approvedQuantity - totalAllocated
+                    {/* Transposed table layout - Buildings as rows, Items as columns */}
+                    <div className="overflow-x-auto rounded-md border">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="px-4 py-3 text-left">大樓</th>
+                            {allocations
+                              .map((allocation) => {
+                                const item = totalAvailable.find((i) => i.itemId === allocation.itemId)
+                                if (!item || allocation.approvedQuantity === 0) return null
+                                return (
+                                  <th key={allocation.itemId} className="px-4 py-3 text-center">
+                                    {item.equipmentName}
+                                    <div className="text-xs font-normal text-muted-foreground mt-1">
+                                      核准: {allocation.approvedQuantity}
+                                    </div>
+                                  </th>
+                                )
+                              })
+                              .filter(Boolean)}
+                            <th className="px-4 py-3 text-center">狀態</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {buildingResponses.map((building) => (
+                            <tr key={building.buildingId} className="border-b">
+                              <td className="px-4 py-3 font-medium">{building.buildingName}</td>
 
-                      return (
-                        <Card key={allocation.itemId}>
-                          <CardHeader>
-                            <CardTitle className="text-base">
-                              {item.equipmentName} (核准數量: {allocation.approvedQuantity})
-                            </CardTitle>
-                            <CardDescription>
-                              已分配: {totalAllocated} / {allocation.approvedQuantity}
-                              {remaining > 0
-                                ? ` (尚需分配 ${remaining})`
-                                : remaining < 0
-                                  ? " (分配過多)"
-                                  : " (已分配完成)"}
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-4">
-                              {allocation.buildingAllocations.map((ba, index) => {
-                                const building = buildingResponses.find((br) => br.buildingId === ba.buildingId)
-                                if (!building) return null
+                              {allocations
+                                .map((allocation) => {
+                                  const item = totalAvailable.find((i) => i.itemId === allocation.itemId)
+                                  if (!item || allocation.approvedQuantity === 0) return null
 
-                                const buildingItem = building.items.find((i) => i.itemId === allocation.itemId)
-                                const maxAvailable = buildingItem ? buildingItem.availableQuantity : 0
+                                  const buildingAllocation = allocation.buildingAllocations.find(
+                                    (ba) => ba.buildingId === building.buildingId,
+                                  )
+                                  const buildingItem = building.items.find((i) => i.itemId === allocation.itemId)
+                                  const maxAvailable = buildingItem ? buildingItem.availableQuantity : 0
+
+                                  return (
+                                    <td key={allocation.itemId} className="px-4 py-3 text-center">
+                                      <div className="flex flex-col items-center">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          max={maxAvailable}
+                                          value={buildingAllocation ? buildingAllocation.allocatedQuantity : 0}
+                                          onChange={(e) =>
+                                            handleBuildingAllocationChange(
+                                              allocation.itemId,
+                                              building.buildingId,
+                                              Math.min(Math.max(0, Number.parseInt(e.target.value) || 0), maxAvailable),
+                                            )
+                                          }
+                                          className="w-16 rounded-md border px-2 py-1 text-center"
+                                        />
+                                        <span className="mt-1 text-xs text-muted-foreground">可用: {maxAvailable}</span>
+                                      </div>
+                                    </td>
+                                  )
+                                })
+                                .filter(Boolean)}
+
+                              <td className="px-4 py-3 text-center">
+                                {(() => {
+                                  const buildingStatus = allocations
+                                    .filter((alloc) => {
+                                      const item = totalAvailable.find((i) => i.itemId === alloc.itemId)
+                                      return item && alloc.approvedQuantity > 0
+                                    })
+                                    .map((alloc) => {
+                                      const ba = alloc.buildingAllocations.find(
+                                        (ba) => ba.buildingId === building.buildingId,
+                                      )
+                                      return ba ? ba.allocatedQuantity : 0
+                                    })
+                                    .reduce((sum, qty) => sum + qty, 0)
+
+                                  return buildingStatus > 0 ? (
+                                    <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-800">
+                                      已分配 {buildingStatus} 件
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-800">
+                                      未分配
+                                    </span>
+                                  )
+                                })()}
+                              </td>
+                            </tr>
+                          ))}
+
+                          {/* Summary row showing total allocations for each item */}
+                          <tr className="border-t-2 border-primary/20 bg-muted/20">
+                            <td className="px-4 py-3 font-medium">已分配總數</td>
+
+                            {allocations
+                              .map((allocation) => {
+                                const item = totalAvailable.find((i) => i.itemId === allocation.itemId)
+                                if (!item || allocation.approvedQuantity === 0) return null
+
+                                const totalAllocated = allocation.buildingAllocations.reduce(
+                                  (sum, ba) => sum + ba.allocatedQuantity,
+                                  0,
+                                )
+
+                                const isCorrect = totalAllocated === allocation.approvedQuantity
 
                                 return (
-                                  <div key={index} className="flex items-center gap-4">
-                                    <div className="flex-1">
-                                      <p className="font-medium">{building.buildingName}</p>
-                                      <p className="text-sm text-muted-foreground">可提供數量: {maxAvailable}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm">分配數量:</span>
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        max={maxAvailable}
-                                        value={ba.allocatedQuantity}
-                                        onChange={(e) =>
-                                          handleBuildingAllocationChange(
-                                            allocation.itemId,
-                                            ba.buildingId,
-                                            Math.min(Math.max(0, Number.parseInt(e.target.value) || 0), maxAvailable),
-                                          )
-                                        }
-                                        className="w-20 rounded-md border px-2 py-1 text-center"
-                                      />
-                                    </div>
-                                  </div>
+                                  <td key={allocation.itemId} className="px-4 py-3 text-center">
+                                    <span className={`font-medium ${isCorrect ? "text-green-600" : "text-red-600"}`}>
+                                      {totalAllocated} / {allocation.approvedQuantity}
+                                    </span>
+                                  </td>
                                 )
-                              })}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
+                              })
+                              .filter(Boolean)}
+
+                            <td className="px-4 py-3"></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
 
                     <div className="space-y-2">
                       <h3 className="text-lg font-medium">備註說明</h3>

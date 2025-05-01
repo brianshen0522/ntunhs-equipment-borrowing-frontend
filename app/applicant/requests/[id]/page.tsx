@@ -9,6 +9,11 @@ import { Loader2, FileText, AlertTriangle, Clock, CheckCircle, XCircle } from "l
 import { getRequestDetails, closeRequest } from "@/lib/api/requests"
 import type { RequestDetail } from "@/lib/types"
 
+// Update the request detail page to use the toast helper functions
+
+// First, add the import for toast helper functions
+import { successToast, errorToast } from "@/lib/utils/toast-helper"
+
 export default function RequestDetailPage({ params }: { params: { id: string } }) {
   // Unwrap params using React.use()
   // const unwrappedParams = React.use(params)
@@ -20,6 +25,9 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
   const [isLoading, setIsLoading] = useState(true)
   const [isClosing, setIsClosing] = useState(false)
 
+  // Then update the toast calls in the component:
+
+  // In the useEffect for fetchRequestDetails
   useEffect(() => {
     const fetchRequestDetails = async () => {
       try {
@@ -28,19 +36,17 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
         if (response.success) {
           setRequest(response.data)
         } else {
-          toast({
+          errorToast({
             title: "錯誤",
             description: "無法獲取申請詳情，請稍後再試",
-            variant: "destructive",
           })
           router.push("/applicant/requests")
         }
       } catch (error) {
         console.error("Failed to fetch request details:", error)
-        toast({
+        errorToast({
           title: "錯誤",
           description: "無法獲取申請詳情，請稍後再試",
-          variant: "destructive",
         })
         router.push("/applicant/requests")
       } finally {
@@ -51,6 +57,7 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
     fetchRequestDetails()
   }, [requestId, router, toast])
 
+  // In the handleCloseRequest function
   const handleCloseRequest = async () => {
     console.log("Closing request:", requestId) // Debug log
     setIsClosing(true)
@@ -59,7 +66,7 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
       console.log("Close request response:", response) // Debug log
 
       if (response.success) {
-        toast({
+        successToast({
           title: "申請已關閉",
           description: "您的申請已成功關閉",
         })
@@ -69,18 +76,16 @@ export default function RequestDetailPage({ params }: { params: { id: string } }
           setRequest(updatedResponse.data)
         }
       } else {
-        toast({
+        errorToast({
           title: "關閉失敗",
           description: response.error?.message || "無法關閉申請，請稍後再試",
-          variant: "destructive",
         })
       }
     } catch (error) {
       console.error("Failed to close request:", error)
-      toast({
+      errorToast({
         title: "關閉失敗",
         description: "無法關閉申請，請稍後再試",
-        variant: "destructive",
       })
     } finally {
       setIsClosing(false)
